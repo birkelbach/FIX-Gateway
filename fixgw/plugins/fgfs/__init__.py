@@ -25,6 +25,8 @@ import fixgw.plugin as plugin
 items = []
 var_sep = ','
 
+msg_send = 0
+
 class UDPClient(threading.Thread):
     def __init__(self, host, port):
         super(UDPClient, self).__init__()
@@ -42,10 +44,10 @@ class UDPClient(threading.Thread):
         self.msg_recv = 0
 
     def save_data(self, data):
+        #print(data)
         l = data.split(var_sep)
         for i, each in enumerate(l):
-            if items[i].item != None:
-                items[i].item.value = each
+            items[i].value = each
 
     def run(self):
         buff = ""
@@ -76,27 +78,25 @@ class Item(object):
         self.type = ""
         self.conversion = None
 
+    def setValue(self, x):
+        if self.item != None:
+            if self.conversion != None:
+                self.item.value = self.conversion(x)
+            else:
+                self.item.value = x
+
+    def getValue(self, x):
+        if self.item != None:
+            return self.item.value
+        else:
+            return None
+
+    value = property(getValue, setValue)
+
     def __str__(self):
         return self.key
 
-def parseProtocolFile(fg_root, xml_file):
-    # Open the XML Protocol file
-    filepath = os.path.join(fg_root, "Protocol/" + xml_file)
 
-    tree = ET.parse(filepath)
-    root = tree.getroot()
-    if root.tag != "PropertyList":
-        raise ValueError("Root Tag is not PropertyList")
-
-    # TODO Read var_separator tag and adjust accordingly
-    # TODO Get conversion if any and set conversion function
-    generic = root.find("generic")
-    output = generic.find("output")
-    for chunk in output:
-        name = chunk.find("name")
-        if name != None:
-            info = name.text.split(":")
-            items.append(Item(info[0].strip()))
 
 
 class MainThread(threading.Thread):
@@ -115,6 +115,29 @@ class MainThread(threading.Thread):
         self.clientThread.stop()
 
 
+# We use closures for the conversion functions
+def getMultiplyFunction(value):
+    def Function(x):
+        return float(x) * value
+    return Function
+
+def getFtoCFunction(value):
+    def Function(x):
+        return (float(x)-32)*5/9
+    return Function
+
+functions = {"multiply":getMultiplyFunction,
+             "ftoc":getFtoCFunction}
+
+def getConversion(fd):
+    f = fd["function"].lower()
+    value = float(fd.get("value", 1.0))
+    if f in functions:
+        return functions[f](value)
+    else:
+        raise KeyError("{} is not a valid function".format(f))
+
+
 class Plugin(plugin.PluginBase):
     def __init__(self, name, config):
         super(Plugin, self).__init__(name, config)
@@ -122,8 +145,8 @@ class Plugin(plugin.PluginBase):
 
     def run(self):
         try:
-            self.xml_list = parseProtocolFile(self.config['fg_root'],
-                                              self.config['xml_file'])
+            self.xml_list = self.parseProtocolFile(self.config['fg_root'],
+                                                   self.config['xml_file'])
         except Exception as e:
             self.log.critical(e)
             self.stop()
@@ -156,3 +179,31 @@ class Plugin(plugin.PluginBase):
                  "Sent": 0 }
             }
         return d
+
+
+    def parseProtocolFile(self, fg_root, xml_file):
+        # Open the XML Protocol file
+        filepath = os.path.join(fg_root, "Protocol/" + xml_file)
+
+        tree = ET.parse(filepath)
+        root = tree.getroot()
+        if root.tag != "PropertyList":
+            raise ValueError("Root Tag is not PropertyList")
+
+        # TODO Read var_separator tag and adjust accordingly
+        # TODO Get conversion if any and set conversion function
+        generic = root.find("generic")
+        output = generic.find("output")
+        for chunk in output:
+            name = chunk.find("name")
+            if name != None:
+                info = name.text.split(":")
+                i = Item(info[0].strip())
+                conversion = chunk.find("conversion")
+                if conversion != None:
+                    try:
+                        i.conversion = getConversion(conversion.attrib)
+                    except Exception as e:
+                        self.log.error("Problem with conversion definition for {} - {}".format(name.text, e))
+
+                items.append(i)

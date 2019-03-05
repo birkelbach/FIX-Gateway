@@ -9,7 +9,23 @@
    <var_separator>,</var_separator>
 
    <chunk>
-    <name>IAS: Indicated-speed-kt</name>
+       <name>EGT11: Exhaust Gas Temperature</name>
+       <type>double</type>
+       <format>%.1f</format>
+       <node>/engines/engine/egt-degf</node>
+       <conversion function='FtoC' value='1.0'/>
+   </chunk>
+
+   <chunk>
+       <name>CHT11: Cylinder Head Temperature</name>
+       <type>double</type>
+       <format>%.1f</format>
+       <node>/engines/engine/cht-degf</node>
+       <conversion function='FtoC' value='1.0'/>
+   </chunk>
+
+   <chunk>
+    <name>IAS: Indicated Airspeed</name>
     <type>double</type>
     <format>%.1f</format>
     <node>/instrumentation/airspeed-indicator/indicated-speed-kt</node>
@@ -58,11 +74,11 @@
    </chunk>
 
    <chunk>
-    <name>ALAT: AccelerationLateral</name>
+    <name>ALAT: Lateral Acceleration</name>
     <type>double</type>
     <format>%.11f</format>
     <node>/accelerations/pilot/y-accel-fps_sec</node>
-    <factor>0.031070336391437</factor>
+    <conversion function='multiply' value='0.031070336391437' />
    </chunk>
 
    <chunk>
@@ -101,12 +117,11 @@
    </chunk>
 
    <chunk>
-     <name>OILT1: Oil Temp F</name>
-     <type>float</type>
-     <format>%.1f</format>
-     <node>/engines/engine[0]/oil-temperature-degf</node>
-     <offset>-32</offset>
-     <factor>0.55555555555555555</factor>
+    <name>OILT1: Oil Temp F</name>
+    <type>float</type>
+    <format>%.1f</format>
+    <node>/engines/engine[0]/oil-temperature-degf</node>
+    <conversion function='FtoC' value='1.0'/>
    </chunk>
 
    <chunk>
@@ -116,23 +131,6 @@
     <node>/engines/engine[0]/oil-pressure-psi</node>
    </chunk>
 
-   <chunk>
-     <name>EGT11: Exhaust Gas Temperature</name>
-     <type>double</type>
-     <format>%.1f</format>
-     <node>/engines/engine/egt-degf</node>
-     <offset>-32</offset>
-     <factor>0.55555555555555555</factor>
-   </chunk>
-
-   <chunk>
-     <name>CHT11: Cylinder Head Temperature</name>
-     <type>double</type>
-     <format>%.1f</format>
-     <node>/engines/engine/cht-degf</node>
-     <offset>-32</offset>
-     <factor>0.55555555555555555</factor>
-   </chunk>
 
    <chunk>
     <name>FUELF1: Fuel Flow</name>
@@ -176,14 +174,13 @@
     <node>/instrumentation/gps/indicated-longitude-deg</node>
    </chunk>
 
-   <chunk>
-    <name>OAT: Outside Air Temperature</name>
-    <type>double</type>
-    <format>%.1f</format>
-    <node>/environment/temperature-degc</node>
-    <offset>-32</offset>
-    <factor>0.55555555555555555</factor>
-   </chunk>
+    <chunk>
+      <name>OAT: Outside Air Temperature</name>
+      <type>double</type>
+      <format>%.1f</format>
+      <node>/environment/temperature-degc</node>
+      <conversion function='FtoC' value='1.0'/>
+    </chunk>
 
     <chunk>
       <name>BARO: Altimeter Setting</name>
