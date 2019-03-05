@@ -51,7 +51,7 @@ connections:
   # OSX: /Applications/FlightGear.app/Contents/Resources/data/
   # WINDOWS: c:\Program Files\FlightGear\data\
   fgfs:
-    load: no
+    load: yes
     module: fixgw.plugins.fgfs
     # This should be the same as $FG_ROOT on your system.  It is used to help
     # fixgw find the xml configuration files
@@ -93,7 +93,7 @@ connections:
 
   # CAN-FIX
   canfix:
-    load: yes
+    load: no
     module: fixgw.plugins.canfix
     # See the python-can documentation for the meaning of these options
     interface: socketcan
