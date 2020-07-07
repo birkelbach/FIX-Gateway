@@ -22,12 +22,34 @@ import logging
 import threading
 import time
 
+try:
+    from PyQt5.QtGui import *
+    from PyQt5.QtCore import *
+    from PyQt5.QtWidgets import *
+    hasQt = True
+except ImportError:
+    print("Unable to find Qt, Running without")
+    hasQt = False
+    QObject = object
+
 import fixgw.netfix
 
 log = logging.getLogger(__name__)
 
 # This class represents a single data point in the database.
-class DB_Item(object):
+class DB_Item(QObject):
+    if hasQt:
+        valueChanged = pyqtSignal(object)
+        valueWrite = pyqtSignal(object)
+        annunciateChanged = pyqtSignal(bool)
+        oldChanged =  pyqtSignal(bool)
+        badChanged =  pyqtSignal(bool)
+        failChanged =  pyqtSignal(bool)
+        secFailChanged =  pyqtSignal(bool)
+        auxChanged =  pyqtSignal(str, object)
+        reportReceived =  pyqtSignal(bool)
+        destroyed =  pyqtSignal()
+
     def __init__(self, client, key, dtype='float'):
         super(DB_Item, self).__init__()
         if key == None:
@@ -55,23 +77,22 @@ class DB_Item(object):
         self.supressWrite = False
 
         # Callback Functions
-        self.valueChanged = None
-        self.valueWrite = None
-        self.annunciateChanged = None
-        self.oldChanged = None
-        self.badChanged = None
-        self.failChanged = None
-        self.secFailChanged = None
-        self.auxChanged = None
-        self.reportReceived = None
-        self.destroyed = None
+        self._valueChanged = None
+        self._valueWrite = None
+        self._annunciateChanged = None
+        self._oldChanged = None
+        self._badChanged = None
+        self._failChanged = None
+        self._secFailChanged = None
+        self._auxChanged = None
+        self._reportReceived = None
+        self._destroyed = None
 
         log.debug("Creating Item {0}".format(key))
 
     def __str__(self):
         s = "{} = {}".format(self.key, self._value)
         return s
-
 
     # initialize the auxiliary data dictionary.  aux should be a list of
     # aux names
@@ -96,8 +117,9 @@ class DB_Item(object):
                 else:
                     self.aux[name] = self.dtype(value)
                 if self.aux[name] != last:
-                    if self.auxChanged != None:
-                        self.auxChanged(name, value)
+                    if self._auxChanged != None:
+                        self._auxChanged(name, value)
+                    if hasQt: self.auxChanged.emit(name, value)
                     if not self.supressWrite:
                         res = self.client.writeValue("{}.{}".format(self.key, name), self.aux[name])
                         if '!' in res:
@@ -115,8 +137,7 @@ class DB_Item(object):
             try:
                 return self.aux[name]
             except KeyError:
-                log.error("No aux {0} for {1}".format(name, self.description))
-                raise
+                return None
 
     # Outputs the value to the send queue and on to the fixgw server
     def output_value(self):
@@ -176,12 +197,14 @@ class DB_Item(object):
             self.timestamp = datetime.utcnow()
 
         if last != self._value:
-            if self.valueChanged != None:
+            if self._valueChanged != None:
                 # Send the callback if we have a changed value
-                self.valueChanged(self._value)
-        if self.valueWrite != None:
+                self._valueChanged(self._value)
+        if hasQt: self.valueChanged.emit(self._value)
+        if self._valueWrite != None:
             # Send Callback everytime we write to it
-            self.valueWrite(self._value)
+            self._valueWrite(self._value)
+        if hasQt: self.valueWrite.emit(self._value)
         if not self.supressWrite:
             res = self.client.writeValue(self.key, self._value)
             if '!' in res:
@@ -300,8 +323,9 @@ class DB_Item(object):
             self._annunciate = self.convertBool(x)
 
         if self._annunciate != last:
-            if self.annunciateChanged != None:
-                self.annunciateChanged(self._annunciate)
+            if self._annunciateChanged != None:
+                self._annunciateChanged(self._annunciate)
+            if hasQt: self.annunciateChagned.emit(self._annunciate)
             try:
                 if not self.supressWrite:
                     self.client.flag(self.key, 'a', self._annunciate)
@@ -320,8 +344,9 @@ class DB_Item(object):
             self._old = self.convertBool(x)
 
         if self._old != last:
-            if self.oldChanged != None:
-                self.oldChanged(self._old)
+            if self._oldChanged != None:
+                self._oldChanged(self._old)
+            if hasQt: self.oldChanged.emit(self._old)
             try:
                 if not self.supressWrite:
                     self.client.flag(self.key, 'o', self._old)
@@ -340,8 +365,9 @@ class DB_Item(object):
             self._bad = self.convertBool(x)
 
         if self._bad != last:
-            if self.badChanged != None:
-                self.badChanged(self._bad)
+            if self._badChanged != None:
+                self._badChanged(self._bad)
+            if hasQt: self.badChanged.emit(self._bad)
             try:
                 if not self.supressWrite:
                     self.client.flag(self.key, 'b', self._bad)
@@ -360,8 +386,9 @@ class DB_Item(object):
             self._fail = self.convertBool(x)
 
         if self._fail != last:
-            if self.failChanged != None:
-                self.failChanged(self._fail)
+            if self._failChanged != None:
+                self._failChanged(self._fail)
+            if hasQt: self.failChanged.emit(self._fail)
             try:
                 if not self.supressWrite:
                     self.client.flag(self.key, 'f', self._fail)
@@ -380,8 +407,9 @@ class DB_Item(object):
             self._secFail = self.convertBool(x)
 
         if self._secFail != last:
-            if self.secFailChanged != None:
-                self.secFailChanged(self._secFail)
+            if self._secFailChanged != None:
+                self._secFailChanged(self._secFail)
+            if hasQt: self.secFailChanged.emit(self._secFail)
             try:
                 if not self.supressWrite:
                     self.client.flag(self.key, 's', self._secFail)
@@ -441,7 +469,7 @@ class Database(object):
         # Callback functions
         self.connectCallback = None
 
-    # These are the callbacks that we use to get events from teh client
+    # These are the callbacks that we use to get events from the client
     # This function is called when the connection state of the client
     # changes.  It recievs a True when connected and False when disconnected
     def connectFunction(self, x):
@@ -483,7 +511,7 @@ class Database(object):
         log.debug("Initializing Database")
         if self.__items != {}:
             log.warning("Trying to initialize an already initialized database")
-            return
+            #return
         try:
             keys = self.client.getList()
             for key in keys:
@@ -529,8 +557,8 @@ class Database(object):
         item.value = res[1]
         for each in item.aux: # Read the Auxiliary data
             self.client.read("{0}.{1}".format(key, each))
-        if item.reportReceived != None:
-            item.reportReceived()
+        if item._reportReceived != None:
+            item._reportReceived()
 
         # Subscribe to the point
         self.client.subscribe(key)

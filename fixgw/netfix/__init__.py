@@ -85,7 +85,7 @@ class ClientThread(threading.Thread):
             self.connectCallback(connected)
 
     def handle_request(self, d):
-        log.debug("Response - {}".format(d))
+        #log.debug("Response - {}".format(d))
         if d[0] == '@':
             self.cmdqueue.put([d[1], d[2:]])
         else:
@@ -106,11 +106,11 @@ class ClientThread(threading.Thread):
 
     def run(self):
         log.debug("ClientThread - Starting")
+
         while True:
             self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.s.settimeout(self.timeout)
-
             try:
                 self.s.connect((self.host, self.port))
             except Exception as e:
@@ -214,13 +214,13 @@ class Client:
         self.cthread.daemon = True
         self.lock = threading.Lock()
 
-    def connect(self):
+    def connect(self, timeout=1.0):
         self.cthread.start()
-        return self.cthread.connectWait()
+        return self.cthread.connectWait(timeout)
 
     def disconnect(self):
         self.cthread.stop()
-        # TODO: Block unit disconnected.
+        # TODO: Block until disconnected.
 
     def isConnected(self):
         return self.cthread.isConnected()
