@@ -22,19 +22,20 @@ import logging
 import threading
 import time
 
+log = logging.getLogger(__name__)
+
 try:
     from PyQt5.QtGui import *
     from PyQt5.QtCore import *
     from PyQt5.QtWidgets import *
     hasQt = True
 except ImportError:
-    print("Unable to find Qt, Running without")
+    log.warn("Unable to find Qt, Running without")
     hasQt = False
     QObject = object
 
 import fixgw.netfix
 
-log = logging.getLogger(__name__)
 
 # This class represents a single data point in the database.
 class DB_Item(QObject):
@@ -150,14 +151,14 @@ class DB_Item(QObject):
         db.queue_out("{0};{1};{2}\n".format(self.key, self.value, flags).encode())
 
     # return the age of the item in milliseconds
-    @property
-    def age(self):
+    def getAge(self):
         with self.lock:
             d = datetime.utcnow() - self.timestamp
             return d.total_seconds() * 1000 + d.microseconds / 1000
 
-    @property
-    def value(self):
+    age = property(getAge)
+
+    def getValue(self):
         with self.lock:
             return self._value #, self.annunciate, self.old, self.bad, self.fail)
 
@@ -188,8 +189,7 @@ class DB_Item(QObject):
                     pass  # ignore at this point
         return y
 
-    @value.setter
-    def value(self, x):
+    def setValue(self, x):
         with self.lock:
             last = self._value
             self._value = self.valueConvert(x)
@@ -215,8 +215,9 @@ class DB_Item(QObject):
             y = self.valueConvert(vals[1])
             if y != last:
                 # Resend the valueChanged callback
-                if self.valueChanged != None:
-                    self.valueChanged(self._value)
+                if self._valueChanged != None:
+                    self._valueChanged(self._value)
+                self.valueChanged.emit(self._value)
                 # Set the actual stored value to the different one returned
                 # from the server
                 self._value = y
@@ -229,14 +230,13 @@ class DB_Item(QObject):
             self.secFail = vals[2][4]
             self.supressWrite = False
 
+    value = property(getValue, setValue)
 
-    @property
-    def dtype(self):
+    def getDtype(self):
         with self.lock:
             return self._dtype
 
-    @dtype.setter
-    def dtype(self, dtype):
+    def setDtype(self, dtype):
         with self.lock:
             types = {'float':float, 'int':int, 'bool':bool, 'str':str}
             try:
@@ -247,59 +247,62 @@ class DB_Item(QObject):
                 log.error("Unknown datatype - " + str(dtype))
                 raise
 
-    @property
-    def typestring(self):
+    dtype = property(getDtype, setDtype)
+
+    def getTypestring(self):
         with self.lock:
             return self._typestring
 
-    @property
-    def units(self):
+    typestring = property(getTypestring)
+
+    def getUnits(self):
         with self.lock:
             return self._units
 
-    @units.setter
-    def units(self, value):
+    def setUnits(self, value):
         with self.lock:
             self._units = value.replace("deg",u'\N{DEGREE SIGN}')
 
-    @property
-    def min(self):
+    units = property(getUnits, setUnits)
+
+    def getMin(self):
         with self.lock:
             return self._min
 
-    @min.setter
-    def min(self, x):
+    def setMin(self, x):
         with self.lock:
             try:
                 self._min = self.dtype(x)
             except ValueError:
                 log.error("Bad minimum value '" + str(x) + "' given for " + self.description)
 
-    @property
-    def max(self):
+    min = property(getMin, setMin)
+
+    def getMax(self):
         with self.lock:
             return self._max
 
-    @max.setter
-    def max(self, x):
+    def setMax(self, x):
         with self.lock:
             try:
                 self._max = self.dtype(x)
             except ValueError:
                 log.error("Bad maximum value '" + str(x) + "' given for " + self.description)
 
-    @property
-    def tol(self):
+    max = property(getMax, setMax)
+
+    def getTol(self):
         with self.lock:
             return self._tol
 
-    @tol.setter
-    def tol(self, x):
+    def setTol(self, x):
         with self.lock:
             try:
                 self._tol = int(x)
             except ValueError:
                 log.error("Time to live should be an integer for " + self.description)
+
+    tol = property(getTol, setTol)
 
     def convertBool(self, x):
         if type(x) == str:
@@ -311,13 +314,11 @@ class DB_Item(QObject):
         else:
             return bool(x)
 
-    @property
-    def annunciate(self):
+    def getAnnunciate(self):
         with self.lock:
             return self._annunciate
 
-    @annunciate.setter
-    def annunciate(self, x):
+    def setAnnunciate(self, x):
         with self.lock:
             last = self._annunciate
             self._annunciate = self.convertBool(x)
@@ -325,20 +326,20 @@ class DB_Item(QObject):
         if self._annunciate != last:
             if self._annunciateChanged != None:
                 self._annunciateChanged(self._annunciate)
-            if hasQt: self.annunciateChagned.emit(self._annunciate)
+            if hasQt: self.annunciateChanged.emit(self._annunciate)
             try:
                 if not self.supressWrite:
                     self.client.flag(self.key, 'a', self._annunciate)
             except Exception as e:
                 log.error(e)
 
-    @property
-    def old(self):
+    annunciate = property(getAnnunciate, setAnnunciate)
+
+    def getOld(self):
         with self.lock:
             return self._old
 
-    @old.setter
-    def old(self, x):
+    def setOld(self, x):
         with self.lock:
             last = self._old
             self._old = self.convertBool(x)
@@ -353,13 +354,13 @@ class DB_Item(QObject):
             except Exception as e:
                 log.error(e)
 
-    @property
-    def bad(self):
+    old = property(getOld, setOld)
+
+    def getBad(self):
         with self.lock:
             return self._bad
 
-    @bad.setter
-    def bad(self, x):
+    def setBad(self, x):
         with self.lock:
             last = self._bad
             self._bad = self.convertBool(x)
@@ -374,13 +375,13 @@ class DB_Item(QObject):
             except Exception as e:
                 log.error(e)
 
-    @property
-    def fail(self):
+    bad = property(getBad, setBad)
+
+    def getFail(self):
         with self.lock:
             return self._fail
 
-    @fail.setter
-    def fail(self, x):
+    def setFail(self, x):
         with self.lock:
             last = self._fail
             self._fail = self.convertBool(x)
@@ -395,13 +396,13 @@ class DB_Item(QObject):
             except Exception as e:
                 log.error(e)
 
-    @property
-    def secFail(self):
+    fail = property(getFail, setFail)
+
+    def getSecFail(self):
         with self.lock:
             return self._secFail
 
-    @secFail.setter
-    def secFail(self, x):
+    def setSecFail(self, x):
         with self.lock:
             last = self._secFail
             self._secFail = self.convertBool(x)
@@ -415,6 +416,8 @@ class DB_Item(QObject):
                     self.client.flag(self.key, 's', self._secFail)
             except Exception as e:
                 log.error(e)
+
+    secFail = property(getSecFail, setSecFail)
 
     def updateNoWrite(self, report):
         with self.lock:

@@ -17,7 +17,7 @@
 #  This module contains all of the functions that interact with the server
 #  for the GUI client.
 
-import fixgw.netfix.QtDb
+import fixgw.netfix.db
 
 client = None
 db = None
@@ -26,4 +26,4 @@ def initialize(c):
     global client
     global db
     client = c
-    db = fixgw.netfix.QtDb.Database(client)
+    db = fixgw.netfix.db.Database(client)
